@@ -1,0 +1,9 @@
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart myapp
+  systemd:
+    name: myapp
+    state: restarted
+    enabled: yes

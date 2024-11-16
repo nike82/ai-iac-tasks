@@ -1,0 +1,20 @@
+---
+- name: Install PostgreSQL
+  apt:
+    name: postgresql  # Specifies the package to install
+    state: latest  # Ensures the latest version of PostgreSQL is installed
+  # This task installs the PostgreSQL database server using the apt package manager. PostgreSQL is a powerful, open source relational database.
+
+- name: Ensure database is created
+  postgresql_db:
+    name: your_db_name  # Name of the database to be created
+    state: present  # Ensures that the database exists
+  # This task utilizes the postgresql_db module to ensure that a specific database exists. If it does not exist, it will be created.
+
+- name: Ensure user has access to database
+  postgresql_user:
+    db: your_db_name  # Database the user needs access to
+    name: "{{ db_user }}"  # The name of the user
+    password: "{{ db_password }}"  # Password of the user
+  # This task utilizes the postgresql_user module to ensure a database user exists with access to the specified database. This includes setting the password for user authentication.
+  # The task sets up the user and grants them access to operate on the database specified.

@@ -1,0 +1,72 @@
+# nginx.conf.j2
+user nginx;  # Specifies the user for Nginx worker processes.
+worker_processes auto;  # Enables Nginx to adjust worker processes automatically.
+pid /run/nginx.pid;  # Path to the PID file.
+include /usr/share/nginx/modules/*.conf;  # Include additional configuration modules.
+
+events {
+    worker_connections 1024;  # Maximum number of simultaneous connections per worker process.
+}
+
+http {
+    # Log format definition, which specifies the logging characteristics.
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;  # Path for the access log.
+    sendfile            on;  # Allows transmitting files from disk directly to the network.
+    tcp_nopush          on;  # Sends the HTTP header in one packet.
+    tcp_nodelay         on;  # Disables Nagle's algorithm for better throughput.
+    keepalive_timeout   65;  # Timeout for keep-alive connections.
+    types_hash_max_size 2048;  # Maximum hash table size for types.
+    include             /etc/nginx/mime.types;  # Includes the MIME types file.
+    default_type        application/octet-stream;  # Default MIME type.
+
+    # Including server sub-configurations stored in conf.d directory.
+    include /etc/nginx/conf.d/*.conf;
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl default_server;
+        listen [::]:443 ssl default_server;
+        server_name _;
+
+        ssl_certificate /etc/ssl/certs/nginx-cert.crt;
+        ssl_certificate_key /etc/ssl/private/nginx-key.key;
+        # IP Access restrictions using whitelist defined in Ansible variables.
+        {% for ip in nginx_user_whitelist %}
+        allow {{ ip }};  # Allow each IP from the whitelist.
+        {% endfor %}
+        deny all;  # Deny all other IPs.
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-XSS-Protection "1; mode=block";
+        add_header X-Content-Type-Options "nosniff";
+
+        server_tokens off;  # Disable emitting Nginx version number on error pages and in the “Server” response header field.
+
+        location / {
+            limit_req zone=one burst=5 nodelay;  # Apply rate limiting to protect against DDoS.
+            try_files $uri $uri/ =404;  # Handle file locations.
+        }
+
+        # Error pages handling.
+        error_page 404 /404.html;
+        location = /40x.html {}
+
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {}
+    }
+
+    # GZIP Compression for specified types
+    gzip on;
+    gzip_types  text/plain application/xml application/json;
+    gzip_proxied any;
+}

@@ -1,0 +1,44 @@
+---
+# Security enhancements
+- name: Ensure password policies for all required accounts
+  user:
+    name: "{{ item }}"  # Dynamically replaces the username for configured password policies
+    password_expire_days: 90  # Configures password expiration to 90 days for each user
+  with_items: "{{ app_users }}"  # Loops through the list of application users provided
+  # This task enforces a password expiration policy for specified application users to enhance account security.
+
+- name: Ensure password policy tools are installed
+  apt:
+    name: libpam-pwquality  # Specifies the package that enhances password strength checking
+    state: latest  # Ensures the latest version of the pwquality library is installed
+  # This task installs the libpam-pwquality package, which is a PAM module to perform password quality checks.
+
+- name: Configure password expiration in login definitions
+  lineinfile:
+    path: /etc/login.defs  # The file where login definitions like password aging policies are stored
+    regexp: "{{ item.regex }}"  # Regular expression to find the line needing replacement
+    line: "{{ item.line }}"  # New line to be set in the configuration file
+  loop:
+    - { regex: '^PASS_MAX_DAYS', line: 'PASS_MAX_DAYS    90' }  # Sets the maximum number of days for password expiration
+    - { regex: '^PASS_MIN_DAYS', line: 'PASS_MIN_DAYS    1' }  # Sets the minimum number of days before password can be changed
+    - { regex: '^PASS_WARN_AGE', line: 'PASS_WARN_AGE    14' }  # Sets the number of days warning given before password expires
+  # This task ensures that password aging policies are enforced, increasing security by requiring regular password updates.
+
+- name: Configure password complexity
+  lineinfile:
+    path: /etc/security/pwquality.conf  # Path to the password quality control configuration file
+    regexp: '{{ item.regex }}'  # Regular expression for identifying the line to replace
+    line: '{{ item.line }}'  # The new configuration line enforcing a specific policy
+  loop:
+    - { regex: '^minlen', line: 'minlen = 12' }  # Ensures the minimum password length is 12 characters
+    - { regex: '^minclass', line: 'minclass = 4' }  # Enforces password must contain characters from 4 of the 5 classes
+  # This task configures the system to enforce strong password complexity policies.
+
+- name: Update PAM to enforce password quality
+  blockinfile:
+    path: /etc/pam.d/common-password  # Path to the common password file used by PAM
+    block: |
+      password requisite pam_pwquality.so retry=3
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for password quality"
+  # This task updates the PAM configuration to include a block that enforces the use of pwquality module for password validation.
+  # It retries the validation 3 times before failing the password change attempt.

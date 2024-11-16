@@ -1,0 +1,9 @@
+---
+- name: Deploy multi-tier application
+  hosts: all
+  become: yes
+  roles:
+    - { role: nginx, tags: ["nginx", "web"] }
+    - { role: flask_app, tags: ["flask", "app"] }
+    - { role: postgres, tags: ["postgresql", "db"] }
+    - { role: security, tags: ["security"] }

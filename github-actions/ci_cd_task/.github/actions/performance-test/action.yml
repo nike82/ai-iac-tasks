@@ -1,0 +1,31 @@
+name: "Run Performance Tests"
+description: "A custom action to run JMeter performance tests for a Dockerized Python application."
+inputs:
+  jmx_file:
+    description: "The path to the JMeter .jmx file for performance testing"
+    required: true
+  docker_image:
+    description: "The Docker image to test"
+    required: true
+outputs:
+  test_results:
+    description: "Path to the test results file"
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JMeter
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jmeter
+
+    - name: Run JMeter Test
+      run: |
+        jmeter -n -t ${{ inputs.jmx_file }} -l results.jtl
+      continue-on-error: true
+
+    - name: Save Test Results
+      run: |
+        echo "test_results=results.jtl" >> $GITHUB_ENV

@@ -1,0 +1,54 @@
+---
+# Nginx setup including configuration with IP restrictions
+- name: Install dependencies
+  apt:
+    name: "{{ item }}"
+    state: latest
+  with_items:  # Iterates over the list of packages to ensure each is installed in the latest version
+    - nginx  # nginx web server installation for handling HTTP requests
+    - python3-certbot-nginx  # certbot package for managing Let's Encrypt SSL certificates using Python 3
+    - python3-pip  # Python pip package installer 
+  # This task ensures that nginx, certbot plugin for nginx, and pip are installed to handle web traffic and secure connections.
+
+- name: Start Nginx service and enable on boot
+  service:
+    name: nginx  # Specifies nginx service
+    state: started  # Ensures the nginx service is running
+    enabled: yes  # Ensures the nginx service is enabled to start on boot
+
+- name: Deploy secured Nginx configuration
+  template:
+    src: templates/nginx.conf.j2  # Source template for nginx configuration
+    dest: /etc/nginx/nginx.conf  # Destination for the nginx configuration file in the filesystem
+  notify:
+    - restart nginx  # Trigger a handler to restart nginx when configuration changes
+
+- name: Obtain SSL certificates and configure Nginx
+  shell: certbot --nginx -d yourdomain.com --non-interactive --agree-tos -m your@email.com --redirect
+  # Executes certbot CLI with the specified domain, email for registration and notifications
+  # Automatically configures Nginx to use the obtained certificates
+  args:
+    creates: /etc/letsencrypt/live/yourdomain.com/fullchain.pem  # Prevents re-running if cert already exists
+
+- name: Ensure custom SSL directory exists
+  become: true  # Uses elevated privileges
+  file:
+    path: "{{ item }}"
+    state: directory  # Ensures the existence of the directory
+    mode: '0755'  # Sets the permissions of the directory
+  with_items:  # Iterates over the list of directory paths for SSL certificates
+    - /etc/ssl/certs  # Directory for SSL certificates
+    - /etc/ssl/private  # Directory for private keys
+
+- name: Create symbolic links for SSL certificates
+  become: true  # Uses elevated privileges for file operations
+  file:
+    src: "/etc/letsencrypt/live/yourdomain.com/{{ item.src }}"  # Source file path from letsencrypt
+    dest: "{{ item.dest }}"  # Destination path for the symbolic link
+    state: link  # Ensures the state is 'link' indicating a symlink should exist
+  with_items:
+    - { src: 'fullchain.pem', dest: '/etc/ssl/certs/nginx-cert.crt' }  # Map for fullchain.pem
+    - { src: 'privkey.pem', dest: '/etc/ssl/private/nginx-key.key' }  # Map for privkey.pem
+  # Creates symbolic links for the SSL certificate and key to be used in the custom directory paths specified in the nginx config
+  notify:
+    - restart nginx  # Trigger a handler to restart nginx if SSL certs are linked

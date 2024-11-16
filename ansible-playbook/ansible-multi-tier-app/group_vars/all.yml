@@ -1,0 +1,13 @@
+---
+nginx_user_whitelist:
+  - "192.168.1.100"
+  - "127.0.0.1"
+db_user: "appuser"
+db_password: "{{ vault_db_password }}"
+flask_app_src: /path/to/local/flask/app
+flask_app_dest: /path/on/remote/server
+flask_app_cfg_src: templates/flask_config.py.j2
+flask_app_cfg_dest: /path/to/server/flask/config.py
+app_users:
+  - db_admin
+  - app_admin

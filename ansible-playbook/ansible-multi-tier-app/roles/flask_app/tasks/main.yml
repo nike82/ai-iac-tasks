@@ -1,0 +1,48 @@
+---
+- name: Install Python and Flask
+  apt:
+    name: "{{ item }}"  # Using a loop to install multiple items in one task
+    state: latest  # Ensures the latest version is installed
+  loop:
+    - python3  # Install Python 3
+    - python3-pip  # Install pip for Python 3
+  tags: flask  # Tagging to allow specific run using --tags
+
+- name: Install Flask via pip
+  pip:
+    name: flask  # Installing Flask using pip
+
+- name: Deploy Flask application
+  copy:
+    src: "{{ flask_app_src }}"  # Source path of Flask application
+    dest: "{{ flask_app_dest }}"  # Destination path where the Flask application should be copied
+
+- name: Deploy Flask configuration
+  template:
+    src: "{{ flask_app_cfg_src }}"  # Source path of the Flask configuration template
+    dest: "{{ flask_app_cfg_dest }}"  # Destination path where the Flask configuration should be rendered
+
+- name: Install Gunicorn
+  pip:
+    name: gunicorn  # Installing Gunicorn using pip
+
+- name: Run Flask application with Gunicorn
+  systemd:
+    name: myapp  # Name of systemd service
+    enabled: yes  # Ensures the service is enabled on boot
+    state: started  # Ensures the service is running
+    daemon_reload: yes  # Reloads daemon to read any changes
+    service:
+      ExecStart: /usr/local/bin/gunicorn -w 4 -b 0.0.0.0:8000 myapp:app  # Command to start Gunicorn with 4 workers
+      WorkingDirectory: /path/to/server/flask  # Working directory specified for service
+      Environment: "PATH=/usr/bin"  # Environment variable set for service
+    mask: no  # Service is not masked
+
+- name: Create Gunicorn system service for Flask
+  become: true  # Run task with elevated privileges
+  template:
+    src: gunicorn.service.j2  # Source template for systemd service
+    dest: /etc/systemd/system/myapp.service  # Destination for the systemd service
+  notify:
+    - reload systemd  # Handler to reload systemd
+    - restart myapp  # Handler to restart myapp service
